@@ -539,11 +539,7 @@ class Animated_Staircase : public Usermod {
           pinManager.deallocatePin(oldBottomBPin, PinOwner::UM_AnimatedStaircase);
         }
         if (changed) setup();
-        if (oldControlRelay != controlRelay) {  // handle change to control relay option
-          if (!controlRelay && !on) relay_on(); // dropping control of relay, so turn it back on if it was off for staircase state
-          // else if (controlRelay && !on) relay_off(); // set relay off for staircase state
-          // else if (controlRelay && on) relay_on(); // set relay on for staircase state
-        }
+        if (oldControlRelay != controlRelay && !controlRelay && !on) relay_on();  // dropping control of relay turn it back on if it was off
       }
       // use "return !top["newestParameter"].isNull();" when updating Usermod with new features
       return !top[FPSTR(_controlRelay)].isNull(); // return true;
