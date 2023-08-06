@@ -25,6 +25,7 @@ class Animated_Staircase : public Usermod {
     bool useUSSensorBottom         = false; // using PIR or UltraSound sensor?
     unsigned int topMaxDist        = 50;    // default maximum measured distance in cm, top
     unsigned int bottomMaxDist     = 50;    // default maximum measured distance in cm, bottom
+    bool controlRelay              = false; // controlling the relay pin with staircase on state?
 
     /* runtime variables */
     bool initDone = false;
@@ -90,7 +91,8 @@ class Animated_Staircase : public Usermod {
     static const char _bottomEcho_pin[];
     static const char _topEchoCm[];
     static const char _bottomEchoCm[];
-    
+    static const char _controlRelay[];
+
     void publishMqtt(bool bottom, const char* state) {
 #ifndef WLED_DISABLE_MQTT
       //Check if MQTT Connected, otherwise it will crash the 8266
@@ -211,6 +213,7 @@ class Animated_Staircase : public Usermod {
               }
               offIndex = onIndex;
             }
+            if (controlRelay) relay_on();  // todo - delay on swipe by several ms for relay switch latency and powersupply energize
             on = true;
           }
         }
@@ -249,7 +252,10 @@ class Animated_Staircase : public Usermod {
             offIndex = MAX(onIndex, offIndex - 1);
           }
         }
-        if (oldOn != onIndex || oldOff != offIndex) updateSegments(); // reduce the number of updates to necessary ones
+        if (oldOn != onIndex || oldOff != offIndex) {
+          updateSegments(); // reduce the number of updates to necessary ones
+          if (controlRelay && !on && onIndex == offIndex) relay_off();  // relay off once all segments off
+        }
       }
     }
 
@@ -265,8 +271,27 @@ class Animated_Staircase : public Usermod {
       topSensorWrite    = topSensorState    || (staircase[F("top-sensor")].as<bool>());
     }
 
+    // Turn off the relay that switches led powersupply off
+    void relay_off() {
+      if (rlyPin>=0) {
+        pinMode(rlyPin, OUTPUT);
+        digitalWrite(rlyPin, !rlyMde);
+        DEBUG_PRINTLN(F("Relay: OFF"));
+      }
+    }
+
+    // Turn on the relay that switches led powersupply on
+    void relay_on() {
+      if (rlyPin>=0) {
+        pinMode(rlyPin, OUTPUT);
+        digitalWrite(rlyPin, rlyMde);
+        DEBUG_PRINTLN(F("Relay: ON"));
+      }
+    }
+
     void enable(bool enable) {
       if (enable) {
+        if (controlRelay && !on) relay_off();  // staircase on state will control the relay so turn off relay if staircase is off
         DEBUG_PRINTLN(F("Animated Staircase enabled."));
         DEBUG_PRINT(F("Delay between steps: "));
         DEBUG_PRINT(segment_delay_ms);
@@ -295,6 +320,7 @@ class Animated_Staircase : public Usermod {
         strip.setTransition(segment_delay_ms/100);
         strip.trigger();
       } else {
+        if (controlRelay && !on) relay_on();  // ensure exit with the relay turned on, if staircase off when disabled
         // Restore segment options
         for (int i = 0; i <= strip.getLastActiveSegmentId(); i++) {
           Segment &seg = strip.getSegment(i);
@@ -444,6 +470,7 @@ class Animated_Staircase : public Usermod {
       staircase[FPSTR(_bottomEcho_pin)]            = useUSSensorBottom ? bottomEchoPin : -1;
       staircase[FPSTR(_topEchoCm)]                 = topMaxDist;
       staircase[FPSTR(_bottomEchoCm)]              = bottomMaxDist;
+      staircase[FPSTR(_controlRelay)]              = controlRelay;
       DEBUG_PRINTLN(F("Staircase config saved."));
     }
 
@@ -453,6 +480,7 @@ class Animated_Staircase : public Usermod {
     * The function should return true if configuration was successfully loaded or false if there was no configuration.
     */
     bool readFromConfig(JsonObject& root) {
+      bool oldControlRelay = controlRelay;
       bool oldUseUSSensorTop = useUSSensorTop;
       bool oldUseUSSensorBottom = useUSSensorBottom;
       int8_t oldTopAPin = topPIRorTriggerPin;
@@ -488,6 +516,8 @@ class Animated_Staircase : public Usermod {
       bottomMaxDist = top[FPSTR(_bottomEchoCm)] | bottomMaxDist;
       bottomMaxDist = min(150,max(30,(int)bottomMaxDist));  // max distance ~1.5m (a lag of 9ms may be expected)
 
+      controlRelay = top[FPSTR(_controlRelay)] | controlRelay;  // staircase controls relay pin by on state and swipe off end
+
       DEBUG_PRINT(FPSTR(_name));
       if (!initDone) {
         // first run: reading from cfg.json
@@ -509,9 +539,14 @@ class Animated_Staircase : public Usermod {
           pinManager.deallocatePin(oldBottomBPin, PinOwner::UM_AnimatedStaircase);
         }
         if (changed) setup();
+        if (oldControlRelay != controlRelay) {  // handle change to control relay option
+          if (!controlRelay && !on) relay_on(); // dropping control of relay, so turn it back on if it was off for staircase state
+          // else if (controlRelay && !on) relay_off(); // set relay off for staircase state
+          // else if (controlRelay && on) relay_on(); // set relay on for staircase state
+        }
       }
       // use "return !top["newestParameter"].isNull();" when updating Usermod with new features
-      return true;
+      return !top[FPSTR(_controlRelay)].isNull(); // return true;
     }
 
     /*
@@ -551,3 +586,4 @@ const char Animated_Staircase::_bottomPIRorTrigger_pin[]    PROGMEM = "bottomPIR
 const char Animated_Staircase::_bottomEcho_pin[]            PROGMEM = "bottomEcho_pin";
 const char Animated_Staircase::_topEchoCm[]                 PROGMEM = "top-dist-cm";
 const char Animated_Staircase::_bottomEchoCm[]              PROGMEM = "bottom-dist-cm";
+const char Animated_Staircase::_controlRelay[]              PROGMEM = "control-relay";
