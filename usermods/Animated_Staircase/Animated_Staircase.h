@@ -48,6 +48,9 @@ class Animated_Staircase : public Usermod {
   #define UPPER true
     bool lastSensor = LOWER;
 
+    // Time of the last relay on action
+    unsigned long relayTime = 0;
+
     // Time of the last transition action
     unsigned long lastTime = 0;
 
@@ -213,7 +216,7 @@ class Animated_Staircase : public Usermod {
               }
               offIndex = onIndex;
             }
-            if (controlRelay) relay_on();  // todo - delay on swipe by several ms for relay switch latency and powersupply energize
+            if (controlRelay) relay_on();
             on = true;
           }
         }
@@ -237,6 +240,7 @@ class Animated_Staircase : public Usermod {
 
     void updateSwipe() {
       if ((millis() - lastTime) > segment_delay_ms) {
+        if ((controlRelay && on && onIndex == offIndex && ((millis() - relayTime) < 10))) return;  // delay swipe for relay switch on latency
         lastTime = millis();
 
         byte oldOn  = onIndex;
@@ -285,6 +289,7 @@ class Animated_Staircase : public Usermod {
       if (rlyPin>=0) {
         pinMode(rlyPin, OUTPUT);
         digitalWrite(rlyPin, rlyMde);
+        relayTime = millis()
         DEBUG_PRINTLN(F("Relay: ON"));
       }
     }
