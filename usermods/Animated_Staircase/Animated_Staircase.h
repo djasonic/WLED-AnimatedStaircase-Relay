@@ -240,7 +240,7 @@ class Animated_Staircase : public Usermod {
 
     void updateSwipe() {
       if ((millis() - lastTime) > segment_delay_ms) {
-        if ((controlRelay && on && onIndex == offIndex && ((millis() - relayTime) < 50))) return;  // delay swipe for relay switch on latency
+        if ((controlRelay && on && onIndex == offIndex && ((millis() - relayTime) < 20))) return;  // delay swipe for relay switch on latency
         lastTime = millis();
 
         byte oldOn  = onIndex;
