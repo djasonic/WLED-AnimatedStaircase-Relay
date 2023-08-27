@@ -25,7 +25,7 @@ class Animated_Staircase : public Usermod {
     bool useUSSensorBottom         = false; // using PIR or UltraSound sensor?
     unsigned int topMaxDist        = 50;    // default maximum measured distance in cm, top
     unsigned int bottomMaxDist     = 50;    // default maximum measured distance in cm, bottom
-    bool togglePower 	             = false; // toggle power on/off with staircase on/off
+    bool togglePower               = false; // toggle power on/off with staircase on/off
 
     /* runtime variables */
     bool initDone = false;
